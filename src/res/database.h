@@ -23,7 +23,7 @@ class Database {
 
     std::optional<Record> get(
         const ::Web::Uri::Uri &uri,
-        const ::Web::Http::AcceptHeader &accept) const;
+        const ::Web::Http::Accept &accept) const;
     void put(const ::Web::Uri::Uri &uri, const Record &record);
     void remove(const ::Web::Uri::Uri &uri);
     void remove(const ::Web::Uri::Uri &uri, ::Web::Media::Type type);

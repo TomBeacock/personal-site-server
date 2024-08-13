@@ -73,7 +73,7 @@ Database::~Database()
 
 std::optional<Record> Database::get(
     const Uri::Uri &uri,
-    const Http::AcceptHeader &accept) const
+    const Http::Accept &accept) const
 {
     ReadLock lock(this->resource_mutex);
 
@@ -95,11 +95,11 @@ std::optional<Record> Database::get(
         }
         return false;
     };
-    for (const Http::AcceptHeader::Type &weighted_type : accept.types) {
+    for (const Http::Accept::Type &weighted_type : accept.types) {
         if (weighted_type.weight <= highest_weight) {
             continue;
         }
-        switch (weighted_type.type) {
+        switch (weighted_type.media_type) {
             case Media::Type::Any: {
                 highest_weight = weighted_type.weight;
                 const auto &[type, path] = *res_map.begin();
@@ -168,10 +168,10 @@ std::optional<Record> Database::get(
                 break;
             }
             default: {
-                if (auto type_it = res_map.find(weighted_type.type);
+                if (auto type_it = res_map.find(weighted_type.media_type);
                     type_it != res_map.end()) {
                     highest_weight = weighted_type.weight;
-                    record.type = weighted_type.type;
+                    record.type = weighted_type.media_type;
                     record.path = type_it->second;
                 }
                 break;

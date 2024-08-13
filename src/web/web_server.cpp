@@ -23,15 +23,13 @@ Server::Server(
       static_content_db(static_content_db)
 {}
 
-void Server::on_request_received(const Http::Request &request)
+void Server::on_request_received(Http::Request &request)
 {
-    auto accept_header = request.get_header<Http::AcceptHeader>();
-    if (!accept_header) {
-        accept_header = {
-            .types = {{Media::Type::Any, 1000}},
-        };
+    Http::Accept &accept_header = request.get_or_create_header<Http::Accept>();
+    if (accept_header.types.size() == 0) {
+        accept_header.types.push_back({Media::Type::Any, 1000});
     }
-    auto record = this->static_content_db.get(request.target, *accept_header);
+    auto record = this->static_content_db.get(request.target, accept_header);
     if (record) {
         Http::Response response(Http::Version::Http_1_1, Http::Status::Ok);
 
@@ -44,9 +42,12 @@ void Server::on_request_received(const Http::Request &request)
             std::istreambuf_iterator<Byte>(file),
             std::istreambuf_iterator<Byte>());
 
-        response.headers["content-type"] = Media::to_string(record->type);
-        response.headers["content-length"] =
-            std::to_string(response.body.size());
+        Http::ContentType &content_type =
+            response.get_or_create_header<Http::ContentType>();
+        content_type.media_type = record->type;
+        Http::ContentLength &content_length =
+            response.get_or_create_header<Http::ContentLength>();
+        content_length.length = static_cast<Nat>(response.body.size());
 
         send_response(response);
     } else {

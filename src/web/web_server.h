@@ -12,8 +12,7 @@ class Server : public ::Web::Http::Server {
     Server(std::string_view ip, Nat16 port, Res::Database &static_content_db);
 
   protected:
-    virtual void on_request_received(
-        const ::Web::Http::Request &request) override;
+    virtual void on_request_received(::Web::Http::Request &request) override;
 
   private:
     Res::Database &static_content_db;
