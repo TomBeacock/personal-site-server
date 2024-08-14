@@ -12,8 +12,7 @@ constexpr auto allowed_versions =
     Http::Version::Http_1_0 | Http::Version::Http_1_1;
 
 constexpr auto allowed_methods = Http::Method::Get | Http::Method::Head |
-                                 Http::Method::Post | Http::Method::Put |
-                                 Http::Method::Delete;
+                                 Http::Method::Put | Http::Method::Delete;
 
 Server::Server(
     std::string_view ip,
@@ -91,15 +90,63 @@ void Server::on_request_received(Http::Request &request)
             }
             break;
         }
-        case Http::Method::Post: {
-            break;
-        }
         case Http::Method::Put: {
+            auto record = to_record(request.body);
+            if (record) {
+                this->static_content_db.put(request.target, *record);
+                send_response(Http::Status::Ok);
+            } else {
+                send_response(Http::Status::BadRequest);
+            }
             break;
         }
         case Http::Method::Delete: {
             break;
         }
     }
+}
+
+std::optional<Res::Record> Server::to_record(const std::vector<Byte> &body)
+{
+    std::string_view string_body(body.begin(), body.end());
+    Json::Parser parser(string_body);
+    Json::Value json;
+    if (!parser.parse(json)) {
+        return std::nullopt;
+    }
+    Json::Object *json_obj = json.get_if<Json::Object>();
+    if (json_obj == nullptr) {
+        return std::nullopt;
+    }
+
+    // Media type
+    auto type_it = json_obj->find("mediaType");
+    if (type_it == json_obj->end()) {
+        return std::nullopt;
+    }
+    Json::String *media_type_str = type_it->second.get_if<Json::String>();
+    if (media_type_str == nullptr) {
+        return std::nullopt;
+    }
+    auto media_type = Media::to_type(*media_type_str);
+    if (!media_type) {
+        return std::nullopt;
+    }
+
+    // Path
+    auto path_it = json_obj->find("path");
+    if (path_it == json_obj->end()) {
+        return std::nullopt;
+    }
+    Json::String *path_str = path_it->second.get_if<Json::String>();
+    if (path_str == nullptr) {
+        return std::nullopt;
+    }
+    auto path = std::filesystem::path(*path_str);
+
+    return Res::Record{
+        .media_type = *media_type,
+        .path = path,
+    };
 }
 }  // namespace Pss::Content

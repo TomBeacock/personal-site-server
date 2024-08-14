@@ -190,6 +190,20 @@ std::optional<Record> Database::get(
 void Database::put(const Uri::Uri &uri, const Record &record)
 {
     WriteLock lock(this->resource_mutex);
+    if (auto res_it = this->resources.find(uri.get_path());
+        res_it != this->resources.end()) {
+        TypeMap &type_map = res_it->second;
+
+        if (auto type_it = type_map.find(record.media_type);
+            type_it != type_map.end()) {
+            type_it->second = record.path;
+        } else {
+            type_map.emplace(record.media_type, record.path);
+        }
+    } else {
+        this->resources.emplace(
+            uri, TypeMap({{record.media_type, record.path}}));
+    }
 }
 
 void Database::remove(const Uri::Uri &uri)

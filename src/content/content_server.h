@@ -4,7 +4,8 @@
 
 namespace Pss::Res {
 class Database;
-}
+struct Record;
+}  // namespace Pss::Res
 
 namespace Pss::Content {
 class Server : public ::Web::Http::Server {
@@ -13,6 +14,9 @@ class Server : public ::Web::Http::Server {
 
   protected:
     virtual void on_request_received(::Web::Http::Request &request);
+
+  private:
+    std::optional<Res::Record> to_record(const std::vector<Byte> &body);
 
   private:
     Res::Database &static_content_db;
