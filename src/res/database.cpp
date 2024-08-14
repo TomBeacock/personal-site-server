@@ -206,14 +206,25 @@ void Database::put(const Uri::Uri &uri, const Record &record)
     }
 }
 
-void Database::remove(const Uri::Uri &uri)
+bool Database::remove(const Uri::Uri &uri)
 {
     WriteLock lock(this->resource_mutex);
+
+    Size removed_count = this->resources.erase(uri.get_path());
+    return removed_count > 0;
 }
 
-void Database::remove(const Uri::Uri &uri, Media::Type type)
+bool Database::remove(const Uri::Uri &uri, Media::Type type)
 {
     WriteLock lock(this->resource_mutex);
+
+    if (auto res_it = this->resources.find(uri.get_path());
+        res_it != this->resources.end()) {
+        Size removed_count = res_it->second.erase(type);
+        return removed_count > 0;
+    } else {
+        return false;
+    }
 }
 
 void Database::write_to_file() const

@@ -25,8 +25,8 @@ class Database {
         const ::Web::Uri::Uri &uri,
         const ::Web::Http::Accept &accept) const;
     void put(const ::Web::Uri::Uri &uri, const Record &record);
-    void remove(const ::Web::Uri::Uri &uri);
-    void remove(const ::Web::Uri::Uri &uri, ::Web::Media::Type type);
+    bool remove(const ::Web::Uri::Uri &uri);
+    bool remove(const ::Web::Uri::Uri &uri, ::Web::Media::Type type);
 
   private:
     void write_to_file() const;
