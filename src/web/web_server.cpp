@@ -44,7 +44,7 @@ void Server::on_request_received(Http::Request &request)
 
         Http::ContentType &content_type =
             response.get_or_create_header<Http::ContentType>();
-        content_type.media_type = record->type;
+        content_type.media_type = record->media_type;
         Http::ContentLength &content_length =
             response.get_or_create_header<Http::ContentLength>();
         content_length.length = static_cast<Nat>(response.body.size());

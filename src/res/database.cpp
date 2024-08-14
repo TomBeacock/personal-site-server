@@ -88,7 +88,7 @@ std::optional<Record> Database::get(
     auto find_matching_type = [&](bool (*cond)(Media::Type)) -> bool {
         for (const auto &[type, path] : res_map) {
             if (cond(type)) {
-                record.type = type;
+                record.media_type = type;
                 record.path = path;
                 return true;
             }
@@ -103,7 +103,7 @@ std::optional<Record> Database::get(
             case Media::Type::Any: {
                 highest_weight = weighted_type.weight;
                 const auto &[type, path] = *res_map.begin();
-                record.type = type;
+                record.media_type = type;
                 record.path = path;
                 break;
             }
@@ -171,7 +171,7 @@ std::optional<Record> Database::get(
                 if (auto type_it = res_map.find(weighted_type.media_type);
                     type_it != res_map.end()) {
                     highest_weight = weighted_type.weight;
-                    record.type = weighted_type.media_type;
+                    record.media_type = weighted_type.media_type;
                     record.path = type_it->second;
                 }
                 break;

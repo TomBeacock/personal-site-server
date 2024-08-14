@@ -1,6 +1,7 @@
 #include "content_server.h"
 
 #include "res/database.h"
+#include "res/record.h"
 
 #include <json/json_parser.h>
 
@@ -38,7 +39,7 @@ void Server::on_request_received(Http::Request &request)
                     Http::Version::Http_1_1, Http::Status::Ok);
 
                 Json::Object body_obj;
-                body_obj.emplace("mediaType", to_string(record->type));
+                body_obj.emplace("mediaType", to_string(record->media_type));
                 body_obj.emplace("path", record->path.string());
                 Json::Value json_body(std::move(body_obj));
 
@@ -71,7 +72,7 @@ void Server::on_request_received(Http::Request &request)
                     Http::Version::Http_1_1, Http::Status::Ok);
 
                 Json::Object body_obj;
-                body_obj.emplace("mediaType", to_string(record->type));
+                body_obj.emplace("mediaType", to_string(record->media_type));
                 body_obj.emplace("path", record->path.string());
                 Json::Value json_body(std::move(body_obj));
 
