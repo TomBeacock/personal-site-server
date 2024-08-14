@@ -91,7 +91,7 @@ void Server::on_request_received(Http::Request &request)
             break;
         }
         case Http::Method::Put: {
-            auto record = to_record(request.body);
+            auto record = json_body_to_record(request.body);
             if (record) {
                 this->static_content_db.put(request.target, *record);
                 send_response(Http::Status::Ok);
@@ -101,12 +101,41 @@ void Server::on_request_received(Http::Request &request)
             break;
         }
         case Http::Method::Delete: {
+            bool did_remove = false;
+
+            // Check for optional specific type
+            Http::ContentType *const content_type =
+                request.get_header<Http::ContentType>();
+            if (content_type == nullptr) {
+                // Remove all at target
+                did_remove = this->static_content_db.remove(request.target);
+            } else {
+                if (content_type->media_type != Media::Type::Application_Json) {
+                    send_response(Http::Status::BadRequest);
+                    break;
+                }
+                auto media_type = json_body_to_type(request.body);
+                if (media_type) {
+                    // Remove specific type at target
+                    did_remove = this->static_content_db.remove(
+                        request.target, *media_type);
+                } else {
+                    send_response(Http::Status::BadRequest);
+                    break;
+                }
+            }
+            if (did_remove) {
+                send_response(Http::Status::Ok);
+            } else {
+                send_response(Http::Status::NotFound);
+            }
             break;
         }
     }
 }
 
-std::optional<Res::Record> Server::to_record(const std::vector<Byte> &body)
+std::optional<Res::Record> Server::json_body_to_record(
+    const std::vector<Byte> &body)
 {
     std::string_view string_body(body.begin(), body.end());
     Json::Parser parser(string_body);
@@ -148,5 +177,35 @@ std::optional<Res::Record> Server::to_record(const std::vector<Byte> &body)
         .media_type = *media_type,
         .path = path,
     };
+}
+
+std::optional<Media::Type> Server::json_body_to_type(
+    const std::vector<Byte> &body)
+{
+    std::string_view string_body(body.begin(), body.end());
+    Json::Parser parser(string_body);
+    Json::Value json;
+    if (!parser.parse(json)) {
+        return std::nullopt;
+    }
+    Json::Object *json_obj = json.get_if<Json::Object>();
+    if (json_obj == nullptr) {
+        return std::nullopt;
+    }
+
+    // Media type
+    auto type_it = json_obj->find("mediaType");
+    if (type_it == json_obj->end()) {
+        return std::nullopt;
+    }
+    Json::String *media_type_str = type_it->second.get_if<Json::String>();
+    if (media_type_str == nullptr) {
+        return std::nullopt;
+    }
+    auto media_type = Media::to_type(*media_type_str);
+    if (!media_type) {
+        return std::nullopt;
+    }
+    return *media_type;
 }
 }  // namespace Pss::Content
