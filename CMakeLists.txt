@@ -16,17 +16,23 @@ FetchContent_Declare(
 	GIT_TAG origin/main
 )
 
-FetchContent_MakeAvailable(cpp-types cpp-web)
+FetchContent_Declare(
+	cpp-json
+	GIT_REPOSITORY https://github.com/TomBeacock/cpp-json.git
+	GIT_TAG origin/main
+)
+
+FetchContent_MakeAvailable(cpp-types cpp-web cpp-json)
 
 add_executable(personal-site-server 
-	"src/main.cpp"	"src/endian.h"	"src/read_write_mutex.h" "src/read_write_mutex.cpp"	"src/res/record.h"	"src/res/database.h" "src/res/database.cpp"	"src/web/web_server.h" "src/web/web_server.cpp")
+	"src/main.cpp"	"src/endian.h"	"src/read_write_mutex.h" "src/read_write_mutex.cpp"	"src/res/record.h"	"src/res/database.h" "src/res/database.cpp"	"src/web/web_server.h" "src/web/web_server.cpp"	"src/content/content_server.h" "src/content/content_server.cpp")
 
 set_target_properties(personal-site-server PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_include_directories(personal-site-server
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/src"
 )
-target_link_libraries(personal-site-server PUBLIC cpp-types cpp-web)
+target_link_libraries(personal-site-server PUBLIC cpp-types cpp-web cpp-json)
 
 string(LENGTH "${PROJECT_SOURCE_DIR}/" source_path_length)
 target_compile_definitions(personal-site-server PUBLIC SOURCE_PATH_LENGTH=${source_path_length})
