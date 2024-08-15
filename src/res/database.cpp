@@ -10,65 +10,21 @@ using namespace ::Web;
 namespace Pss::Res {
 Database::Database(const std::filesystem::path &path) : path(path)
 {
-    std::ifstream file(this->path, std::ios::in | std::ios::binary);
-    if (!file.is_open()) {
-        LOG_ERROR(
-            "Failed to open database, file not found: {}.", path.string());
-        return;
-    }
-    Nat64 uri_count = 0;
-    file.read(reinterpret_cast<char *>(&uri_count), sizeof(uri_count));
-    if (file.fail()) {
-        LOG_ERROR("Failed to read database, reading URI count failed.");
-        return;
-    }
-    uri_count = from_big_endian(uri_count);
+    read_from_file(path);
 
-    std::string uri_str, type_str, path_str;
-    Nat64 type_count = 0;
-    for (Nat64 i = 0; i < uri_count; i++) {
-        std::getline(file, uri_str, '\0');
-        if (file.fail()) {
-            LOG_ERROR("Failed to read database, reading URI string failed.");
-            return;
-        }
-
-        file.read(reinterpret_cast<char *>(&type_count), sizeof(type_count));
-        type_count = from_big_endian(type_count);
-        if (file.fail()) {
-            LOG_ERROR("Failed to read database, reading type count failed.");
-            return;
-        }
-
-        TypeMap type_map;
-        for (Nat64 j = 0; j < type_count; j++) {
-            std::getline(file, type_str, '\0');
-            if (file.fail()) {
-                LOG_ERROR(
-                    "Failed to read database, reading type string failed.");
-                return;
+    std::jthread file_update_thread([this](std::stop_token stop_token) {
+        while (!stop_token.stop_requested()) {
+            if (this->dirty) {
+                write_to_file();
             }
-            std::getline(file, path_str, '\0');
-            if (file.fail()) {
-                LOG_ERROR(
-                    "Failed to read database, reading path string failed.");
-                return;
-            }
-            auto type = Media::to_type(type_str);
-            if (!type) {
-                LOG_ERROR(
-                    "Failed to read database, invalid type: {}.", type_str);
-                return;
-            }
-            type_map.emplace(*type, path_str);
+            std::this_thread::sleep_for(std::chrono::seconds(5));
         }
-        this->resources.emplace(uri_str, std::move(type_map));
-    }
-}
-
-Database::~Database()
-{
-    write_to_file();
+        // Final write before stopping
+        if (this->dirty) {
+            write_to_file();
+        }
+    });
+    this->file_update_thread = std::move(file_update_thread);
 }
 
 std::optional<Record> Database::get(
@@ -204,6 +160,7 @@ void Database::put(const Uri::Uri &uri, const Record &record)
         this->resources.emplace(
             uri, TypeMap({{record.media_type, record.path}}));
     }
+    this->dirty = true;
 }
 
 bool Database::remove(const Uri::Uri &uri)
@@ -211,20 +168,82 @@ bool Database::remove(const Uri::Uri &uri)
     WriteLock lock(this->resource_mutex);
 
     Size removed_count = this->resources.erase(uri.get_path());
-    return removed_count > 0;
+    bool removed = removed_count > 0;
+    this->dirty = this->dirty || removed;
+    return removed;
 }
 
 bool Database::remove(const Uri::Uri &uri, Media::Type type)
 {
     WriteLock lock(this->resource_mutex);
 
+    bool removed = false;
     if (auto res_it = this->resources.find(uri.get_path());
         res_it != this->resources.end()) {
         Size removed_count = res_it->second.erase(type);
-        return removed_count > 0;
-    } else {
+        removed = removed_count > 0;
+    }
+    this->dirty = this->dirty || removed;
+    return removed;
+}
+
+bool Database::read_from_file(const std::filesystem::path &path)
+{
+    std::ifstream file(this->path, std::ios::in | std::ios::binary);
+    if (!file.is_open()) {
+        LOG_ERROR(
+            "Failed to open database, file not found: {}.", path.string());
         return false;
     }
+    Nat64 uri_count = 0;
+    file.read(reinterpret_cast<char *>(&uri_count), sizeof(uri_count));
+    if (file.fail()) {
+        LOG_ERROR("Failed to read database, reading URI count failed.");
+        return false;
+    }
+    uri_count = from_big_endian(uri_count);
+
+    std::string uri_str, type_str, path_str;
+    Nat64 type_count = 0;
+    for (Nat64 i = 0; i < uri_count; i++) {
+        std::getline(file, uri_str, '\0');
+        if (file.fail()) {
+            LOG_ERROR("Failed to read database, reading URI string failed.");
+            return false;
+        }
+
+        file.read(reinterpret_cast<char *>(&type_count), sizeof(type_count));
+        type_count = from_big_endian(type_count);
+        if (file.fail()) {
+            LOG_ERROR("Failed to read database, reading type count failed.");
+            return false;
+        }
+
+        TypeMap type_map;
+        for (Nat64 j = 0; j < type_count; j++) {
+            std::getline(file, type_str, '\0');
+            if (file.fail()) {
+                LOG_ERROR(
+                    "Failed to read database, reading type string failed.");
+                return false;
+            }
+            std::getline(file, path_str, '\0');
+            if (file.fail()) {
+                LOG_ERROR(
+                    "Failed to read database, reading path string failed.");
+                return false;
+            }
+            auto type = Media::to_type(type_str);
+            if (!type) {
+                LOG_ERROR(
+                    "Failed to read database, invalid type: {}.", type_str);
+                return false;
+            }
+            type_map.emplace(*type, path_str);
+        }
+        this->resources.emplace(uri_str, std::move(type_map));
+    }
+    return true;
 }
 
 void Database::write_to_file() const
@@ -251,5 +270,6 @@ void Database::write_to_file() const
             file.write("\0", 1);
         }
     }
+    this->dirty = false;
 }
 }  // namespace Pss::Res

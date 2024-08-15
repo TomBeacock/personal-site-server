@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <thread>
 
 namespace Pss::Res {
 class Database {
@@ -19,7 +20,6 @@ class Database {
 
   public:
     Database(const std::filesystem::path &path);
-    ~Database();
 
     std::optional<Record> get(
         const ::Web::Uri::Uri &uri,
@@ -29,6 +29,7 @@ class Database {
     bool remove(const ::Web::Uri::Uri &uri, ::Web::Media::Type type);
 
   private:
+    bool read_from_file(const std::filesystem::path &path);
     void write_to_file() const;
 
   private:
@@ -36,5 +37,7 @@ class Database {
     UriMap resources;
     mutable ReadWriteMutex resource_mutex;
     mutable std::mutex file_mutex;
+    std::jthread file_update_thread;
+    mutable std::atomic<bool> dirty;
 };
 }  // namespace Pss::Res
